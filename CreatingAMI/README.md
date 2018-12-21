@@ -1,4 +1,4 @@
-# Description
+# Create AMI
 This script is used to take a disk image in VMDK format, upload it into Amazon Web Services (AWS) and create an AMI that can be used to launch virtual machine instances.  This script uses node.js and the AWS javascript SDK to interact with AWS.  Note that this process is not fast as we are dealing with very large files.
  
  To convert a VMDK disk into an AMI the following things have to be done:
@@ -14,3 +14,7 @@ This script does all of these steps for you.  Without this script, steps 1-4 cou
 
 This script requires three parameters to be passed in.  The first is the name of the vmdk file to use. The second parameter is the volume size.  This is the size of the disk that will be created in AWS.The vmdk file is a compressed disk image so it is hard for this script to know what the full disk size should be.  The last parameter is the software label used to make the vmdk.  This is
 used to put reasonable names and descriptions on the objects in AWS.
+
+
+# Delete AMI 
+This script takes the name of an AMI and searches through all AWS regions for an AMI that matches that name and deletes the AMI and the snapshot and volume used to build the AMI.  Multiple AMI names can be passed in by issuing the -n|--name parameter multiple times

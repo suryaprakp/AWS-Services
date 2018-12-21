@@ -1,0 +1,962 @@
+{
+    "Description": "Netscaler SD-WAN AWS-VPX template creates a HA pair with two instance of SD-WAN with 4 ENIs associated to 4 VPC subnets (Management, LAN, WAN, HA) on primary and secondary. The ENIs are associated with Private IPs and security group defined in VPC. EIP is assigned and associated with the Management.",
+    "Parameters": {
+        "SSHCidrIp": {
+            "Type": "String",
+            "MinLength": "9",
+            "MaxLength": "18",
+            "Description": "The IP address range that can SSH to the EC2 instance (port: 22).",
+            "AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
+            "ConstraintDescription": "Must be a valid IP CIDR range of the form x.x.x.x/x."
+        },
+        "HTTPCidrIp": {
+            "Default": "0.0.0.0/0",
+            "Type": "String",
+            "MinLength": "9",
+            "MaxLength": "18",
+            "Description": "The IP address range that can HTTP to the EC2 instance (port: 80).",
+            "AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
+            "ConstraintDescription": "Must be a valid IP CIDR range of the form x.x.x.x/x."
+        },
+        "HTTPSCidrIp": {
+            "Default": "0.0.0.0/0",
+            "Type": "String",
+            "MinLength": "9",
+            "MaxLength": "18",
+            "Description": "The IP address range that can HTTPS to the EC2 instance (port: 443).",
+            "AllowedPattern": "(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})\\.(\\d{1,3})/(\\d{1,2})",
+            "ConstraintDescription": "Must be a valid IP CIDR range of the form x.x.x.x/x."
+        },
+        "VpcId": {
+            "Default": "example:vpc-aaaaaaaa",
+            "Type": "AWS::EC2::VPC::Id",
+            "Description": "VpcId of your existing Virtual Private Cloud (VPC)"
+        },
+        "ManagementIPSec": {
+            "Default": "",
+            "Type": "String",
+            "Description": "Private IP assigned to the Management ENI of Secondary Instance. Last octet has to be between 5 and 254. Leave empty for automatic assignment."
+        },
+        "WANSubnet": {
+            "Default": "example:subnet-dddddddd",
+            "Type": "AWS::EC2::Subnet::Id",
+            "Description": "SubnetId of an existing subnet in your Virtual Private Cloud (VPC) dedicated for WAN side."
+        },
+        "InstantType": {
+            "Default": "m4.2xlarge",
+            "ConstraintDescription": "Must be a valid EC2 instance type.",
+            "Type": "String",
+            "Description": "Type of SD-WAN instance",
+            "AllowedValues": [
+                "m4.2xlarge",
+                "c3.2xlarge"
+            ]
+        },
+        "LANSubnet": {
+            "Default": "example:subnet-cccccccc",
+            "Type": "AWS::EC2::Subnet::Id",
+            "Description": "SubnetId of an existing subnet in your Virtual Private Cloud (VPC) dedicated for LAN side"
+        },
+        "HASubnet": {
+            "Default": "example:subnet-cccccccc",
+            "Type": "AWS::EC2::Subnet::Id",
+            "Description": "SubnetId of an existing subnet in your Virtual Private Cloud (VPC) dedicated for HA side"
+        },
+        "KeyName": {
+            "ConstraintDescription": "Can contain only alphanumeric characters, spaces, dashes and underscores.",
+            "Description": "Name of an existing EC2 KeyPair to enable SSH access to the instances",
+            "Default": "example testKey",
+            "MinLength": "1",
+            "AllowedPattern": "[-_ a-zA-Z0-9]*",
+            "MaxLength": "64",
+            "Type": "AWS::EC2::KeyPair::KeyName"
+        },
+        "ManagementIP": {
+            "Default": "",
+            "Type": "String",
+            "Description": "Private IP assigned to the Management ENI of Primary Instance. Last octet has to be between 5 and 254. Leave empty for automatic assignment."
+        },
+        "ManagementSubnet": {
+            "Default": "example:subnet-bbbbbbbb",
+            "Type": "AWS::EC2::Subnet::Id",
+            "Description": "SubnetId of an existing subnet in your Virtual Private Cloud (VPC) dedicated for management IP"
+        },
+        "WANIP": {
+            "Default": "",
+            "Type": "String",
+            "Description": "Private IP assigned to the WAN ENI of Primary Instance. Last octet has to be between 5 and 254. Leave empty for automatic assignment."
+        },
+        "WANIPSec": {
+            "Default": "",
+            "Type": "String",
+            "Description": "Private IP assigned to the WAN ENI of Secondary Instance. Last octet has to be between 5 and 254. Leave empty for automatic assignment."
+        },
+        "TenancyType": {
+            "Default": "default",
+            "Type": "String",
+            "Description": "Instance tenancy default or dedicated",
+            "AllowedValues": [
+                "default",
+                "dedicated"
+            ]
+        },
+        "LANIP": {
+            "Default": "",
+            "Type": "String",
+            "Description": "Private IP assigned to the LAN ENI of Primary Instance. Last octet has to be between 5 and 254. Leave empty for automatic assignment."
+        },
+        "LANIPSec": {
+            "Default": "",
+            "Type": "String",
+            "Description": "Private IP assigned to the LAN ENI of Secondary Instance. Last octet has to be between 5 and 254. Leave empty for automatic assignment."
+        },
+        "HAIP": {
+            "Default": "",
+            "Type": "String",
+            "Description": "Private IP assigned to the HA ENI of Primary Instance. Last octet has to be between 5 and 254. Leave empty for automatic assignment."
+        },
+        "HAIPSec": {
+            "Default": "",
+            "Type": "String",
+            "Description": "Private IP assigned to the HA ENI of Secondary Instance. Last octet has to be between 5 and 254. Leave empty for automatic assignment."
+        }
+    },
+    "Metadata": {
+        "AWS::CloudFormation::Interface": {
+            "ParameterGroups": [
+                {
+                    "Label": {
+                        "default": "Virtual Private Network Configuration"
+                    },
+                    "Parameters": [
+                        "VpcId",
+                        "SSHCidrIp",
+                        "HTTPCidrIp",
+                        "HTTPSCidrIp",
+                        "KeyName"
+                    ]
+                },
+                {
+                    "Label": {
+                        "default": "Network Interface Configuration"
+                    },
+                    "Parameters": [
+                        "ManagementSubnet",
+                        "ManagementIP",
+                        "ManagementIPSec",
+                        "LANSubnet",
+                        "LANIP",
+                        "LANIPSec",
+                        "WANSubnet",
+                        "WANIP",
+                        "WANIPSec",
+                        "HASubnet",
+                        "HAIP",
+                        "HAIPSec"
+                    ]
+                }
+            ],
+            "ParameterLabels": {
+                "VpcId": {
+                    "default": "VPC ID"
+                },
+                "SSHCidrIp": {
+                    "default": "Remote SSH CIDR IP"
+                },
+                "HTTPCidrIp": {
+                    "default": "Remote HTTP CIDR IP"
+                },
+                "HTTPSCidrIp": {
+                    "default": "Remote HTTPS CIDR IP"
+                },
+                "ManagementIP": {
+                    "default": "Primary Management IP"
+                },
+                "ManagementIPSec": {
+                    "default": "Secondary Management IP"
+                },
+                "ManagementSubnet": {
+                    "default": "Management Subnetwork"
+                },
+                "LANIP": {
+                    "default": "Primary LAN IP"
+                },
+                "LANIPSec": {
+                    "default": "Secondary LAN IP"
+                },
+                "LANSubnet": {
+                    "default": "LAN Subnetwork"
+                },
+                "WANIP": {
+                    "default": "Primary WAN IP"
+                },
+                "WANIPSec": {
+                    "default": "Secondary WAN IP"
+                },
+                "WANSubnet": {
+                    "default": "WAN Subnetwork"
+                },
+                "HAIP": {
+                    "default": "Primary HA IP"
+                },
+                "HAIPSec": {
+                    "default": "Secondary HA IP"
+                },
+                "HASubnet": {
+                    "default": "HA Subnetwork"
+                },
+                "KeyName": {
+                    "default": "Key Pair"
+                },
+                "InstantType": {
+                    "default": "Instant Type"
+                },
+                "TenancyType": {
+                    "default": "Tenancy Type"
+                }
+            }
+        }
+    },
+    "AWSTemplateFormatVersion": "2010-09-09",
+    "Outputs": {
+        "IPAddressVWSec": {
+            "Description": "Elastic IP address of the SD-WAN Secondary instance associated with Management",
+            "Value": {
+                "Ref": "EipVWipSec"
+            }
+        },
+        "IPAddressVW": {
+            "Description": "Elastic IP address of the SD-WAN Primary instance associated with Management",
+            "Value": {
+                "Ref": "EipVWip"
+            }
+        },
+        "InstanceIdVWSec": {
+            "Description": "Instance Id of newly created Secondary SD-WAN instance",
+            "Value": {
+                "Ref": "VPXInstanceSec"
+            }
+        },
+        "InstanceIdVW": {
+            "Description": "Instance Id of newly created Primary SD-WAN instance",
+            "Value": {
+                "Ref": "VPXInstance"
+            }
+        }
+    },
+    "Conditions": {
+        "UseManagementIP": {
+            "Fn::Not": [
+                {
+                    "Fn::Equals": [
+                        {
+                            "Ref": "ManagementIP"
+                        },
+                        ""
+                    ]
+                }
+            ]
+        },
+        "UseLANIP": {
+            "Fn::Not": [
+                {
+                    "Fn::Equals": [
+                        {
+                            "Ref": "LANIP"
+                        },
+                        ""
+                    ]
+                }
+            ]
+        },
+        "UseManagementIPSec": {
+            "Fn::Not": [
+                {
+                    "Fn::Equals": [
+                        {
+                            "Ref": "ManagementIPSec"
+                        },
+                        ""
+                    ]
+                }
+            ]
+        },
+        "UseLANIPSec": {
+            "Fn::Not": [
+                {
+                    "Fn::Equals": [
+                        {
+                            "Ref": "LANIPSec"
+                        },
+                        ""
+                    ]
+                }
+            ]
+        },
+        "UseWANIP": {
+            "Fn::Not": [
+                {
+                    "Fn::Equals": [
+                        {
+                            "Ref": "WANIP"
+                        },
+                        ""
+                    ]
+                }
+            ]
+        },
+        "UseWANIPSec": {
+            "Fn::Not": [
+                {
+                    "Fn::Equals": [
+                        {
+                            "Ref": "WANIPSec"
+                        },
+                        ""
+                    ]
+                }
+            ]
+        },
+        "UseHAIP": {
+            "Fn::Not": [
+                {
+                    "Fn::Equals": [
+                        {
+                            "Ref": "HAIP"
+                        },
+                        ""
+                    ]
+                }
+            ]
+        },
+        "UseHAIPSec": {
+            "Fn::Not": [
+                {
+                    "Fn::Equals": [
+                        {
+                            "Ref": "HAIPSec"
+                        },
+                        ""
+                    ]
+                }
+            ]
+        }
+    },
+    "Resources": {
+        "SecurityGroup": {
+            "Type": "AWS::EC2::SecurityGroup",
+            "Properties": {
+                "GroupDescription": "Enable SSH access via port 22, HTTP with port 80 and HTTPS with port 443",
+                "VpcId": {
+                    "Ref": "VpcId"
+                },
+                "SecurityGroupIngress": [
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": "22",
+                        "ToPort": "22",
+                        "CidrIp": {
+                            "Ref": "SSHCidrIp"
+                        }
+                    },
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": "80",
+                        "ToPort": "80",
+                        "CidrIp": {
+                            "Ref": "HTTPCidrIp"
+                        }
+                    },
+                    {
+                        "IpProtocol": "tcp",
+                        "FromPort": "443",
+                        "ToPort": "443",
+                        "CidrIp": {
+                            "Ref": "HTTPSCidrIp"
+                        }
+                    }
+                ]
+            }
+        },
+        "LANENI": {
+            "Type": "AWS::EC2::NetworkInterface",
+            "Properties": {
+                "SubnetId": {
+                    "Ref": "LANSubnet"
+                },
+                "GroupSet": [
+                    {
+                        "Ref": "SecurityGroup"
+                    }
+                ],
+                "Description": "ENI connected to LAN subnet",
+                "PrivateIpAddress": {
+                    "Fn::If": [
+                        "UseLANIP",
+                        {
+                            "Ref": "LANIP"
+                        },
+                        {
+                            "Ref": "AWS::NoValue"
+                        }
+                    ]
+                }
+            }
+        },
+        "CitrixNodesInstanceRole": {
+            "Type": "AWS::IAM::Role",
+            "Properties": {
+                "Path": "/",
+                "Policies": [
+                    {
+                        "PolicyName": "Citrixnode",
+                        "PolicyDocument": {
+                            "Version": "2012-10-17",
+                            "Statement": [
+                                {
+                                    "Action": [
+                                        "ec2:DescribeInstances",
+                                        "ec2:DescribeNetworkInterfaces",
+                                        "ec2:DetachNetworkInterface",
+                                        "ec2:AttachNetworkInterface"
+                                    ],
+                                    "Resource": "*",
+                                    "Effect": "Allow"
+                                }
+                            ]
+                        }
+                    }
+                ],
+                "AssumeRolePolicyDocument": {
+                    "Version": "2012-10-17",
+                    "Statement": [
+                        {
+                            "Action": [
+                                "sts:AssumeRole"
+                            ],
+                            "Effect": "Allow",
+                            "Principal": {
+                                "Service": [
+                                    "ec2.amazonaws.com"
+                                ]
+                            }
+                        }
+                    ]
+                }
+            }
+        },
+        "CitrixNodesProfile": {
+            "Type": "AWS::IAM::InstanceProfile",
+            "Properties": {
+                "Path": "/",
+                "Roles": [
+                    {
+                        "Ref": "CitrixNodesInstanceRole"
+                    }
+                ]
+            }
+        },
+        "EipVWipSec": {
+            "Type": "AWS::EC2::EIP",
+            "Properties": {
+                "Domain": "vpc"
+            }
+        },
+        "WANENI": {
+            "Type": "AWS::EC2::NetworkInterface",
+            "Properties": {
+                "SubnetId": {
+                    "Ref": "WANSubnet"
+                },
+                "GroupSet": [
+                    {
+                        "Ref": "SecurityGroup"
+                    }
+                ],
+                "Description": "ENI connected to WAN subnet",
+                "PrivateIpAddress": {
+                    "Fn::If": [
+                        "UseWANIP",
+                        {
+                            "Ref": "WANIP"
+                        },
+                        {
+                            "Ref": "AWS::NoValue"
+                        }
+                    ]
+                }
+            }
+        },
+        "EipVWip": {
+            "Type": "AWS::EC2::EIP",
+            "Properties": {
+                "Domain": "vpc"
+            }
+        },
+        "VWipENISec": {
+            "Type": "AWS::EC2::NetworkInterface",
+            "Properties": {
+                "SubnetId": {
+                    "Ref": "ManagementSubnet"
+                },
+                "GroupSet": [
+                    {
+                        "Ref": "SecurityGroup"
+                    }
+                ],
+                "Description": "ENI connected to Management subnet",
+                "PrivateIpAddress": {
+                    "Fn::If": [
+                        "UseManagementIPSec",
+                        {
+                            "Ref": "ManagementIPSec"
+                        },
+                        {
+                            "Ref": "AWS::NoValue"
+                        }
+                    ]
+                }
+            }
+        },
+        "AssociateEipVWipSec": {
+            "Type": "AWS::EC2::EIPAssociation",
+            "Properties": {
+                "NetworkInterfaceId": {
+                    "Ref": "VWipENISec"
+                },
+                "AllocationId": {
+                    "Fn::GetAtt": [
+                        "EipVWipSec",
+                        "AllocationId"
+                    ]
+                }
+            }
+        },
+        "VPXInstanceSec": {
+            "Type": "AWS::EC2::Instance",
+            "Properties": {
+                "Tags": [
+                    {
+                        "Value": "SDWANSecondary",
+                        "Key": "Name"
+                    }
+                ],
+                "ImageId": {
+                    "Fn::FindInMap": [
+                        "AWSRegionArch2AMI",
+                        {
+                            "Ref": "AWS::Region"
+                        },
+                        {
+                            "Fn::FindInMap": [
+                                "AWSInstanceType2Arch",
+                                {
+                                    "Ref": "InstantType"
+                                },
+                                "Arch"
+                            ]
+                        }
+                    ]
+                },
+                "KeyName": {
+                    "Ref": "KeyName"
+                },
+                "Tenancy": {
+                    "Ref": "TenancyType"
+                },
+                "IamInstanceProfile": {
+                    "Ref": "CitrixNodesProfile"
+                },
+                "InstanceType": {
+                    "Ref": "InstantType"
+                },
+                "NetworkInterfaces": [
+                    {
+                        "DeviceIndex": "0",
+                        "NetworkInterfaceId": {
+                            "Ref": "VWipENISec"
+                        }
+                    },
+                    {
+                        "DeviceIndex": "1",
+                        "NetworkInterfaceId": {
+                            "Ref": "LANENISec"
+                        }
+                    },
+                    {
+                        "DeviceIndex": "2",
+                        "NetworkInterfaceId": {
+                            "Ref": "WANENISec"
+                        }
+                    },
+                    {
+                        "DeviceIndex": "3",
+                        "NetworkInterfaceId": {
+                            "Ref": "HAENISec"
+                        }
+                    }
+                ]
+            }
+        },
+        "AssociateEipVWip": {
+            "Type": "AWS::EC2::EIPAssociation",
+            "Properties": {
+                "NetworkInterfaceId": {
+                    "Ref": "VWipENI"
+                },
+                "AllocationId": {
+                    "Fn::GetAtt": [
+                        "EipVWip",
+                        "AllocationId"
+                    ]
+                }
+            }
+        },
+        "VPXInstance": {
+            "Type": "AWS::EC2::Instance",
+            "Properties": {
+                "Tags": [
+                    {
+                        "Value": "SDWANPrimary",
+                        "Key": "Name"
+                    }
+                ],
+                "ImageId": {
+                    "Fn::FindInMap": [
+                        "AWSRegionArch2AMI",
+                        {
+                            "Ref": "AWS::Region"
+                        },
+                        {
+                            "Fn::FindInMap": [
+                                "AWSInstanceType2Arch",
+                                {
+                                    "Ref": "InstantType"
+                                },
+                                "Arch"
+                            ]
+                        }
+                    ]
+                },
+                "KeyName": {
+                    "Ref": "KeyName"
+                },
+                "Tenancy": {
+                    "Ref": "TenancyType"
+                },
+                "IamInstanceProfile": {
+                    "Ref": "CitrixNodesProfile"
+                },
+                "InstanceType": {
+                    "Ref": "InstantType"
+                },
+                "NetworkInterfaces": [
+                    {
+                        "DeviceIndex": "0",
+                        "NetworkInterfaceId": {
+                            "Ref": "VWipENI"
+                        }
+                    },
+                    {
+                        "DeviceIndex": "1",
+                        "NetworkInterfaceId": {
+                            "Ref": "LANENI"
+                        }
+                    },
+                    {
+                        "DeviceIndex": "2",
+                        "NetworkInterfaceId": {
+                            "Ref": "WANENI"
+                        }
+                    },
+                    {
+                        "DeviceIndex": "3",
+                        "NetworkInterfaceId": {
+                            "Ref": "HAENI"
+                        }
+                    }
+                ]
+            }
+        },
+        "VWipENI": {
+            "Type": "AWS::EC2::NetworkInterface",
+            "Properties": {
+                "SubnetId": {
+                    "Ref": "ManagementSubnet"
+                },
+                "GroupSet": [
+                    {
+                        "Ref": "SecurityGroup"
+                    }
+                ],
+                "Description": "ENI connected to Management subnet",
+                "PrivateIpAddress": {
+                    "Fn::If": [
+                        "UseManagementIP",
+                        {
+                            "Ref": "ManagementIP"
+                        },
+                        {
+                            "Ref": "AWS::NoValue"
+                        }
+                    ]
+                }
+            }
+        },
+        "LANENISec": {
+            "Type": "AWS::EC2::NetworkInterface",
+            "Properties": {
+                "SubnetId": {
+                    "Ref": "LANSubnet"
+                },
+                "GroupSet": [
+                    {
+                        "Ref": "SecurityGroup"
+                    }
+                ],
+                "Description": "ENI connected to LAN subnet",
+                "PrivateIpAddress": {
+                    "Fn::If": [
+                        "UseLANIPSec",
+                        {
+                            "Ref": "LANIPSec"
+                        },
+                        {
+                            "Ref": "AWS::NoValue"
+                        }
+                    ]
+                }
+            }
+        },
+        "WANENISec": {
+            "Type": "AWS::EC2::NetworkInterface",
+            "Properties": {
+                "SubnetId": {
+                    "Ref": "WANSubnet"
+                },
+                "GroupSet": [
+                    {
+                        "Ref": "SecurityGroup"
+                    }
+                ],
+                "Description": "ENI connected to WAN subnet",
+                "PrivateIpAddress": {
+                    "Fn::If": [
+                        "UseWANIPSec",
+                        {
+                            "Ref": "WANIPSec"
+                        },
+                        {
+                            "Ref": "AWS::NoValue"
+                        }
+                    ]
+                }
+            }
+        },
+        "HAENI": {
+            "Type": "AWS::EC2::NetworkInterface",
+            "Properties": {
+                "SubnetId": {
+                    "Ref": "HASubnet"
+                },
+                "GroupSet": [
+                    {
+                        "Ref": "SecurityGroup"
+                    }
+                ],
+                "Description": "ENI connected to HA subnet",
+                "PrivateIpAddress": {
+                    "Fn::If": [
+                        "UseHAIP",
+                        {
+                            "Ref": "HAIP"
+                        },
+                        {
+                            "Ref": "AWS::NoValue"
+                        }
+                    ]
+                }
+            }
+        },
+        "HAENISec": {
+            "Type": "AWS::EC2::NetworkInterface",
+            "Properties": {
+                "SubnetId": {
+                    "Ref": "HASubnet"
+                },
+                "GroupSet": [
+                    {
+                        "Ref": "SecurityGroup"
+                    }
+                ],
+                "Description": "ENI connected to HA subnet",
+                "PrivateIpAddress": {
+                    "Fn::If": [
+                        "UseHAIPSec",
+                        {
+                            "Ref": "HAIPSec"
+                        },
+                        {
+                            "Ref": "AWS::NoValue"
+                        }
+                    ]
+                }
+            }
+        }
+    },
+    "Mappings": {
+        "AWSRegionArch2AMI": {
+            "us-east-1": {
+                "32": "NOT_YET_SUPPORTED",
+                "64": "ami-9488d5ef",
+                "64Cluster": "NOT_YET_SUPPORTED",
+                "64GPU": "NOT_YET_SUPPORTED"
+            },
+            "us-east-2": {
+                "32": "NOT_YET_SUPPORTED",
+                "64": "ami-9488d5ef",
+                "64Cluster": "NOT_YET_SUPPORTED",
+                "64GPU": "NOT_YET_SUPPORTED"
+            },
+            "us-west-2": {
+                "32": "NOT_YET_SUPPORTED",
+                "64": "ami-9488d5ef",
+                "64Cluster": "NOT_YET_SUPPORTED",
+                "64GPU": "NOT_YET_SUPPORTED"
+            },
+            "us-west-1": {
+                "32": "NOT_YET_SUPPORTED",
+                "64": "ami-9488d5ef",
+                "64Cluster": "NOT_YET_SUPPORTED",
+                "64GPU": "NOT_YET_SUPPORTED"
+            },
+            "ca-central-1": {
+                "32": "NOT_YET_SUPPORTED",
+                "64": "ami-9488d5ef",
+                "64Cluster": "NOT_YET_SUPPORTED",
+                "64GPU": "NOT_YET_SUPPORTED"
+            },
+            "eu-central-1": {
+                "32": "NOT_YET_SUPPORTED",
+                "64": "ami-9488d5ef",
+                "64Cluster": "NOT_YET_SUPPORTED",
+                "64GPU": "NOT_YET_SUPPORTED"
+            },
+            "eu-west-1": {
+                "32": "NOT_YET_SUPPORTED",
+                "64": "ami-9488d5ef",
+                "64Cluster": "NOT_YET_SUPPORTED",
+                "64GPU": "NOT_YET_SUPPORTED"
+            },
+            "eu-west-2": {
+                "32": "NOT_YET_SUPPORTED",
+                "64": "ami-9488d5ef",
+                "64Cluster": "NOT_YET_SUPPORTED",
+                "64GPU": "NOT_YET_SUPPORTED"
+            },
+            "ap-northeast-1": {
+                "32": "NOT_YET_SUPPORTED",
+                "64": "ami-9488d5ef",
+                "64Cluster": "NOT_YET_SUPPORTED",
+                "64GPU": "NOT_YET_SUPPORTED"
+            },
+            "ap-northeast-2": {
+                "32": "NOT_YET_SUPPORTED",
+                "64": "ami-9488d5ef",
+                "64Cluster": "NOT_YET_SUPPORTED",
+                "64GPU": "NOT_YET_SUPPORTED"
+            },
+            "ap-southeast-1": {
+                "32": "NOT_YET_SUPPORTED",
+                "64": "ami-9488d5ef",
+                "64Cluster": "NOT_YET_SUPPORTED",
+                "64GPU": "NOT_YET_SUPPORTED"
+            },
+            "ap-southeast-2": {
+                "32": "NOT_YET_SUPPORTED",
+                "64": "ami-9488d5ef",
+                "64Cluster": "NOT_YET_SUPPORTED",
+                "64GPU": "NOT_YET_SUPPORTED"
+            },
+            "ap-south-1": {
+                "32": "NOT_YET_SUPPORTED",
+                "64": "ami-9488d5ef",
+                "64Cluster": "NOT_YET_SUPPORTED",
+                "64GPU": "NOT_YET_SUPPORTED"
+            },
+            "sa-east-1": {
+                "32": "NOT_YET_SUPPORTED",
+                "64": "ami-9488d5ef",
+                "64Cluster": "NOT_YET_SUPPORTED",
+                "64GPU": "NOT_YET_SUPPORTED"
+            }
+        },
+        "AWSInstanceType2Arch": {
+            "m3.2xlarge": {
+                "Arch": "64"
+            },
+            "m4.2xlarge": {
+                "Arch": "64"
+            },
+            "m4.xlarge": {
+                "Arch": "64"
+            },
+            "m3.large": {
+                "Arch": "64"
+            },
+            "m4.4xlarge": {
+                "Arch": "64"
+            },
+            "m4.10xlarge": {
+                "Arch": "64"
+            },
+            "m3.xlarge": {
+                "Arch": "64"
+            }
+        },
+        "AWSVPXAMI": {
+            "us-east-1": {
+                "AMI": "ami-9488d5ef"
+            },
+            "us-east-2": {
+                "AMI": "ami-9488d5ef"
+            },
+            "us-west-1": {
+                "AMI": "ami-9488d5ef"
+            },
+            "us-west-2": {
+                "AMI": "ami-9488d5ef"
+            },
+            "ca-central-1": {
+                "AMI": "ami-9488d5ef"
+            },
+            "eu-central-1": {
+                "AMI": "ami-9488d5ef"
+            },
+            "eu-west-1": {
+                "AMI": "ami-9488d5ef"
+            },
+            "eu-west-2": {
+                "AMI": "ami-9488d5ef"
+            },
+            "ap-northeast-1": {
+                "AMI": "ami-9488d5ef"
+            },
+            "ap-northeast-2": {
+                "AMI": "ami-9488d5ef"
+            },
+            "ap-southeast-1": {
+                "AMI": "ami-9488d5ef"
+            },
+            "ap-southeast-2": {
+                "AMI": "ami-9488d5ef"
+            },
+            "ap-south-1": {
+                "AMI": "ami-9488d5ef"
+            },
+            "sa-east-1": {
+                "AMI": "ami-9488d5ef"
+            }
+        }
+    }
+}

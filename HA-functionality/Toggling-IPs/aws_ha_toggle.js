@@ -1,14 +1,3 @@
-/*******************************************************************************
-Description:
-a) This file is used on AWS platforms when High Availablity is turned on
-b) This script shifts secondary private IP's from Stand-by to Active after failover
-c) This script shifts elastic IP from Stand-by to Active after failover
-d) Changes the route entry in LAN route table associated to LAN subnet.
-
-Author: Surya Prakash Patel
-Release: 9.3.1
-**********************************************************************************/
-
 function ReplaceRoute()
 {
     var route_params; 

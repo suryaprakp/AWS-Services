@@ -10,14 +10,7 @@ This script is used to take a disk image in VMDK format, upload it into Amazon W
  - Register the snapshot as an AMI.
  - Copy the AMI to all of the Amazon regions.
 
- This script does all of these steps for you.  Without this script, steps 1-4 could be initiated with the
- ec2-import-volume command.  You would have to then run ec2-describe-conversion-tasks repeatedly to determine when the
- import of the volume was complete.  The ec2-create-snapshot could then be run to start the snapshot process and
- ec2-describe-snapshots could be run repeatedly to determine when the snapshot had completed.  Finally, the
- ec2-register command could be run to register the AMI.
+This script does all of these steps for you.  Without this script, steps 1-4 could be initiated with the ec2-import-volume command.  You  would have to then run ec2-describe-conversion-tasks repeatedly to determine when the import of the volume was complete.  The ec2-create-snapshot could then be run to start the snapshot process and ec2-describe-snapshots could be run repeatedly to determine when the snapshot had completed.  Finally, the ec2-register command could be run to register the AMI.
 
- This script requires three parameters to be passed in.  The first is the name of the vmdk file to use.  The second
- parameter is the volume size.  This is the size of the disk that will be created in AWS.  For the cloud APNA this
- should be 40, for Aware it should be 9.  The vmdk file is a compressed disk image so it is hard for this script to
- know what the full disk size should be.  The last parameter is the software label used to make the vmdk.  This is
- used to put reasonable names and descriptions on the objects in AWS.
+This script requires three parameters to be passed in.  The first is the name of the vmdk file to use. The second parameter is the volume size.  This is the size of the disk that will be created in AWS.The vmdk file is a compressed disk image so it is hard for this script to know what the full disk size should be.  The last parameter is the software label used to make the vmdk.  This is
+used to put reasonable names and descriptions on the objects in AWS.

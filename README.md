@@ -7,3 +7,4 @@ All AWS services related code, focusing mainly on Infra as Code and IAAS and PAA
 
 Lambda services
 - Lambda functions to auto tag important tags useful while for any monitoring tool
+- Example we are using DataDog monitoring tool 

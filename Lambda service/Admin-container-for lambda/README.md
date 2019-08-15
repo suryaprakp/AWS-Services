@@ -10,7 +10,7 @@ This project autotags ec2 resources on startup and reboots . Tags which are asso
  Usage:
  - start the admin container ./admin-container.sh envs/lab
  - after logging into the container, use admin_terraform_plan to see changes to your infrastructure
- - use admin_terraform_apply to apply changes to your infre
+ - use admin_terraform_apply to apply changes to your infrastructure
  
 # Lambda trigger flow
 Cloudwatch events --> lambda function --> Request KMS to decrypt Datadog API keys --> Authenticate to Datadog API --> Post request to Datadog resources

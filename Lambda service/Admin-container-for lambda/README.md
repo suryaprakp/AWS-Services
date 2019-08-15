@@ -5,7 +5,12 @@ This project autotags ec2 resources on startup and reboots . Tags which are asso
 
  # Containerizing 
 
- We have containarised the builidng / execution of AWS API's and terraform so that all the dependencies are taken care also securing credentials in the environment  
+ We have containarised the builidng / execution of AWS API's and terraform so that all the dependencies are taken care also securing credentials in the environment 
+ 
+ Usage:
+ - start the admin container ./admin-container.sh envs/lab
+ - after logging into the container, use admin_terraform_plan to see changes to your infrastructure
+ - use admin_terraform_apply to apply changes to your infre
  
 # Lambda trigger flow
 Cloudwatch events --> lambda function --> Request KMS to decrypt Datadog API keys --> Authenticate to Datadog API --> Post request to Datadog resources

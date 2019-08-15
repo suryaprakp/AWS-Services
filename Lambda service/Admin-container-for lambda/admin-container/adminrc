@@ -1,0 +1,45 @@
+# This file is meant to be sourced into the shell environment in the
+# admin container.
+
+if [ ! -v ADMIN_ROOT ]; then
+    echo "ERROR: ADMIN_ROOT not set" >&2
+    return 1
+fi
+
+function admin_help(){
+    echo "Available admin functions:"
+    declare -F | grep 'admin_' | cut -d' ' -f 3
+}
+
+if [ ! -v DEPLOY_ROOT ]; then
+    echo "ERROR: DEPLOY_ROOT not set" >&2
+    return 1
+fi
+
+function _admin_cd_workdir() {
+    cd "$DEPLOY_ROOT" || return 1
+}
+
+# source terraform functions
+source "${ADMIN_ROOT}/admin.terraform.sh"
+
+# source aws functions
+source "${ADMIN_ROOT}/admin.aws.sh"
+
+# source datadog functions
+source "${ADMIN_ROOT}/admin.datadog.sh"
+
+# export aws credentials
+_admin_aws_export_credentials
+
+# export datadog credentials
+_admin_datadog_export_credentials
+
+# init terraform
+_admin_terraform_init
+
+cd "$DEPLOY_ROOT"
+
+function _admin_cd_terraform_dir() {
+    cd "$DEPLOY_ROOT" || return 1
+}

@@ -1,0 +1,9 @@
+Welcome to the admin container
+
+# Example usage
+
+    admin_terraform_plan
+
+# admin_ commands
+
+Run admin_help to see all available admin commands.

@@ -1,0 +1,18 @@
+# Source global definitions
+if [ -f /etc/bashrc ]; then
+    source /etc/bashrc
+fi
+
+export ADMIN_ROOT=${HOME}/admin
+export DEPLOY_ROOT=/deploy
+export HOME_ROOT=/root
+
+if [ -f ${ADMIN_ROOT}/adminrc ]; then
+    source ${ADMIN_ROOT}/adminrc
+fi
+
+# Print welcome message
+cat ${ADMIN_ROOT}/WELCOME
+echo ""
+admin_help
+

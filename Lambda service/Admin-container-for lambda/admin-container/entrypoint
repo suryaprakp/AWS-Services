@@ -1,0 +1,51 @@
+#!/bin/sh
+# This script should be used as an ENTRYPOINT script for a Docker
+# container. It will "bootstrap" the admin container environment.
+set -euo pipefail
+IFS=$'\n\t'
+
+export ADMIN_ROOT=/root/admin
+DEPLOY_ROOT=/deploy
+HOME_ROOT=/root
+
+function _log_error(){
+    touch /var/log/entrypoint.log
+    echo "$1" > /var/log/entrypoint.log
+}
+
+function _ensure_file(){
+    if [ ! -f "$1" ]; then
+        _log_error "Could not locate required file $1 in deploy root"
+        exit 1
+    fi
+}
+
+function _ensure_dir(){
+    if [ ! -d "$1" ]; then
+        _log_error "Could not locate required directory $1 in deploy root"
+        exit 1
+    fi
+}
+
+# Pre-checks
+_ensure_dir ${DEPLOY_ROOT}
+_ensure_dir ${HOME_ROOT}/.datadog
+_ensure_dir ${HOME_ROOT}/.aws
+
+# Copy aws keys
+
+if [ $# -gt 0 ]; then
+    if [[ "$1" =~ ^admin_ ]]; then
+        # Source in adminrc so that one can run invoke admin_
+        # functions as entrypoint commands.
+        source ${ADMIN_ROOT}/adminrc
+        _admin_cd_workdir || exit 1
+        eval "$@"
+    else
+        set +u
+        /bin/sh -c "$@"
+    fi
+else
+    echo "Putting container pid 1 into sleep loop. Attach separately to use interactively."
+    while true; do sleep 1; done
+fi
